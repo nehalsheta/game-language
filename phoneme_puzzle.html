@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phoneme Puzzle — Language Technology Game</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f4f4f0;color:#1a1a18;min-height:100vh;padding:2rem 1rem;display:flex;justify-content:center}
+.game{max-width:680px;width:100%}
+.topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;flex-wrap:wrap;gap:8px}
+.topbar h2{font-size:18px;font-weight:500}
+.topbar p{font-size:12px;color:#6b6b67;margin-top:2px}
+.stats{display:flex;gap:8px;flex-wrap:wrap}
+.st{background:#eeeee8;border-radius:8px;padding:5px 14px;font-size:13px;color:#6b6b67}
+.st b{color:#1a1a18;font-weight:500}
+.progress-bar{height:4px;background:#ddd;border-radius:2px;margin-bottom:1.25rem;overflow:hidden}
+.progress-fill{height:100%;background:#534AB7;border-radius:2px;transition:width .4s}
+.word-card{background:#fff;border:0.5px solid rgba(0,0,0,0.12);border-radius:12px;padding:1.25rem;margin-bottom:1rem;text-align:center}
+.word-label{font-size:11px;font-weight:500;color:#999;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.word-display{font-size:36px;font-weight:500;letter-spacing:4px;margin-bottom:4px}
+.word-hint{font-size:13px;color:#6b6b67;font-style:italic}
+.slot-row{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-bottom:1rem}
+.slot{width:64px;height:64px;border-radius:10px;border:1.5px dashed #bbb;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:background .15s;background:#f4f4f0}
+.slot.filled{border-style:solid;border-color:#7F77DD;background:#EEEDFE;cursor:pointer}
+.slot.filled .slot-ipa{color:#26215C}
+.slot.filled .slot-desc{color:#534AB7}
+.slot-num{font-size:10px;color:#aaa;margin-bottom:2px}
+.slot-ipa{font-size:22px;font-weight:500;line-height:1}
+.slot-desc{font-size:9px;color:#aaa;margin-top:2px;text-align:center;line-height:1.2}
+.pieces-area{background:#fff;border:0.5px solid rgba(0,0,0,0.12);border-radius:12px;padding:1rem;margin-bottom:1rem}
+.pieces-label{font-size:11px;font-weight:500;color:#999;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.pieces-grid{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.piece{width:64px;height:64px;border-radius:10px;border:0.5px solid #AFA9EC;background:#EEEDFE;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:opacity .15s}
+.piece:hover{background:#CECBF6}
+.piece.selected{border:2px solid #534AB7;background:#CECBF6}
+.piece.used{opacity:.3;pointer-events:none}
+.piece-ipa{font-size:22px;font-weight:500;color:#26215C;line-height:1}
+.piece-desc{font-size:9px;color:#534AB7;margin-top:2px;text-align:center;line-height:1.2}
+.action-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:1rem}
+button{padding:8px 20px;border-radius:8px;font-size:13px;cursor:pointer;border:0.5px solid rgba(0,0,0,0.2);background:#fff;color:#1a1a18;font-family:inherit}
+button:hover{background:#f4f4f0}
+button:disabled{opacity:.4;cursor:default}
+.btn-p{background:#534AB7;color:#EEEDFE;border-color:#534AB7}
+.btn-p:hover{background:#3C3489}
+.feedback{border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.6;margin-bottom:1rem}
+.feedback.success{background:#E1F5EE;color:#085041;border:0.5px solid #9FE1CB}
+.feedback.error{background:#FCEBEB;color:#791F1F;border:0.5px solid #F09595}
+.feedback.hint{background:#EEEDFE;color:#26215C;border:0.5px solid #AFA9EC}
+.info-box{background:#eeeee8;border-radius:8px;padding:10px 14px;font-size:12px;color:#6b6b67;margin-bottom:1rem;line-height:1.6}
+.info-box b{color:#1a1a18;font-weight:500}
+</style>
+</head>
+<body>
+<div class="game">
+  <div class="topbar">
+    <div>
+      <h2>Phoneme puzzle</h2>
+      <p>Language Technology — Speech &amp; Phonetics</p>
+    </div>
+    <div class="stats">
+      <div class="st">Score <b id="sc">0</b></div>
+      <div class="st">Level <b id="lv">1</b>/8</div>
+      <div class="st">Hints <b id="hn">3</b></div>
+    </div>
+  </div>
+  <div class="progress-bar"><div class="progress-fill" id="pf" style="width:0%"></div></div>
+  <div id="gameArea"></div>
+</div>
+
+<script>
+const levels=[
+  {word:"CAT",hint:"A small furry pet",phonemes:[{ipa:"/k/",desc:"velar stop"},{ipa:"/æ/",desc:"short a"},{ipa:"/t/",desc:"alveolar stop"}]},
+  {word:"SHIP",hint:"Travels on water",phonemes:[{ipa:"/ʃ/",desc:"palatal fricative"},{ipa:"/ɪ/",desc:"short i"},{ipa:"/p/",desc:"bilabial stop"}]},
+  {word:"TREE",hint:"Has leaves and branches",phonemes:[{ipa:"/t/",desc:"alveolar stop"},{ipa:"/r/",desc:"approximant"},{ipa:"/iː/",desc:"long ee"}]},
+  {word:"PHONE",hint:"You call people with it",phonemes:[{ipa:"/f/",desc:"labiodental fricative"},{ipa:"/oʊ/",desc:"diphthong"},{ipa:"/n/",desc:"nasal stop"}]},
+  {word:"CHAIR",hint:"You sit on it",phonemes:[{ipa:"/tʃ/",desc:"affricate"},{ipa:"/ɛ/",desc:"short e"},{ipa:"/r/",desc:"approximant"}]},
+  {word:"LIGHT",hint:"Opposite of dark",phonemes:[{ipa:"/l/",desc:"lateral approximant"},{ipa:"/aɪ/",desc:"diphthong"},{ipa:"/t/",desc:"alveolar stop"}]},
+  {word:"THINK",hint:"What your brain does",phonemes:[{ipa:"/θ/",desc:"dental fricative"},{ipa:"/ɪ/",desc:"short i"},{ipa:"/ŋ/",desc:"velar nasal"},{ipa:"/k/",desc:"velar stop"}]},
+  {word:"SPLASH",hint:"Water hits a surface",phonemes:[{ipa:"/s/",desc:"alveolar fricative"},{ipa:"/p/",desc:"bilabial stop"},{ipa:"/l/",desc:"lateral"},{ipa:"/æ/",desc:"short a"},{ipa:"/ʃ/",desc:"palatal fricative"}]}
+];
+
+let currentLevel=0,score=0,hintsLeft=3;
+let slots=[],selectedPiece=null,pieces=[],phase="play",feedback="";
+
+function shuffle(a){return [...a].sort(()=>Math.random()-.5)}
+
+function loadLevel(){
+  const lv=levels[currentLevel];
+  slots=lv.phonemes.map(()=>null);
+  pieces=shuffle(lv.phonemes.map((p,i)=>({...p,id:i,used:false,selected:false})));
+  selectedPiece=null;phase="play";feedback="";
+  render();
+}
+
+function render(){
+  const lv=levels[currentLevel];
+  document.getElementById("sc").textContent=score;
+  document.getElementById("lv").textContent=currentLevel+1;
+  document.getElementById("hn").textContent=hintsLeft;
+  document.getElementById("pf").style.width=Math.round(currentLevel/8*100)+"%";
+
+  if(phase==="done"){
+    document.getElementById("gameArea").innerHTML=`
+      <div class="word-card">
+        <div class="word-label">All levels complete!</div>
+        <div class="word-display" style="font-size:28px">${score} / 8</div>
+        <div class="word-hint">${score>=6?"Excellent phoneme master!":score>=4?"Good job! Keep practicing.":"Keep studying IPA symbols."}</div>
+      </div>
+      <div class="action-row" style="justify-content:center"><button class="btn-p" onclick="restart()">Play again</button></div>`;
+    return;
+  }
+
+  let slotsHTML=`<div class="slot-row">`;
+  slots.forEach((s,i)=>{
+    let cls="slot"+(s?" filled":"");
+    slotsHTML+=`<div class="${cls}" onclick="slotClick(${i})">
+      <div class="slot-num">${i+1}</div>
+      ${s?`<div class="slot-ipa">${s.ipa}</div><div class="slot-desc">${s.desc}</div>`:`<div style="font-size:18px;color:#ccc">?</div>`}
+    </div>`;
+  });
+  slotsHTML+=`</div>`;
+
+  let piecesHTML=`<div class="pieces-area"><div class="pieces-label">Available phonemes — click to select, then click a slot</div><div class="pieces-grid">`;
+  pieces.forEach((p,i)=>{
+    let cls="piece"+(p.used?" used":"")+(selectedPiece===i?" selected":"");
+    piecesHTML+=`<div class="${cls}" onclick="pieceClick(${i})">
+      <div class="piece-ipa">${p.ipa}</div>
+      <div class="piece-desc">${p.desc}</div>
+    </div>`;
+  });
+  piecesHTML+=`</div></div>`;
+
+  let fbHTML="";
+  if(feedback){
+    const cls=feedback.startsWith("Correct")||feedback.startsWith("Perfect")?"success":feedback.startsWith("Not")||feedback.startsWith("Wrong")?"error":"hint";
+    fbHTML=`<div class="feedback ${cls}">${feedback}</div>`;
+  }
+
+  let actHTML=`<div class="action-row">
+    <button class="btn-p" onclick="checkAnswer()">Check answer</button>
+    <button onclick="clearSlots()">Clear</button>
+    <button onclick="useHint()" ${hintsLeft===0?"disabled":""}>Hint (${hintsLeft} left)</button>
+  </div>`;
+
+  let infoHTML=`<div class="info-box"><b>What is a phoneme?</b> The smallest unit of sound that changes meaning. "CAT" has 3 phonemes: /k/ /æ/ /t/. Place the IPA symbols in the correct order to match the word's pronunciation.</div>`;
+
+  document.getElementById("gameArea").innerHTML=`
+    <div class="word-card">
+      <div class="word-label">Spell out the phonemes of</div>
+      <div class="word-display">${lv.word}</div>
+      <div class="word-hint">${lv.hint}</div>
+    </div>
+    ${slotsHTML}
+    ${piecesHTML}
+    ${actHTML}
+    ${fbHTML}
+    ${infoHTML}`;
+}
+
+function pieceClick(i){
+  if(pieces[i].used) return;
+  selectedPiece=selectedPiece===i?null:i;
+  feedback="";render();
+}
+
+function slotClick(i){
+  if(selectedPiece===null){
+    if(slots[i]){
+      const p=slots[i];
+      const idx=pieces.findIndex(x=>x.id===p.id);
+      if(idx!==-1) pieces[idx].used=false;
+      slots[i]=null;feedback="";render();
+    }
+    return;
+  }
+  if(slots[i]){
+    const old=slots[i];
+    const oldIdx=pieces.findIndex(x=>x.id===old.id);
+    if(oldIdx!==-1) pieces[oldIdx].used=false;
+  }
+  slots[i]=pieces[selectedPiece];
+  pieces[selectedPiece].used=true;
+  selectedPiece=null;feedback="";render();
+}
+
+function clearSlots(){
+  slots=levels[currentLevel].phonemes.map(()=>null);
+  pieces.forEach(p=>p.used=false);
+  selectedPiece=null;feedback="";render();
+}
+
+function checkAnswer(){
+  const lv=levels[currentLevel];
+  if(slots.some(s=>s===null)){feedback="Fill all slots before checking!";render();return;}
+  const correct=slots.every((s,i)=>s.ipa===lv.phonemes[i].ipa);
+  if(correct){
+    score++;
+    feedback=`Correct! ${lv.word} = ${lv.phonemes.map(p=>p.ipa).join(" ")}`;
+    phase="result";
+    setTimeout(()=>{
+      currentLevel++;
+      if(currentLevel>=levels.length){phase="done";render();}
+      else loadLevel();
+    },1800);
+  } else {
+    feedback="Not quite — check the order of the phonemes. Try again!";
+  }
+  render();
+}
+
+function useHint(){
+  if(hintsLeft===0) return;
+  const lv=levels[currentLevel];
+  const firstEmpty=slots.findIndex(s=>s===null);
+  if(firstEmpty===-1){feedback="All slots filled — check your answer!";render();return;}
+  const correctPhoneme=lv.phonemes[firstEmpty];
+  const pieceIdx=pieces.findIndex(p=>p.ipa===correctPhoneme.ipa&&!p.used);
+  if(pieceIdx!==-1){
+    slots[firstEmpty]=pieces[pieceIdx];
+    pieces[pieceIdx].used=true;
+    hintsLeft--;
+    feedback=`Hint: slot ${firstEmpty+1} = ${correctPhoneme.ipa} (${correctPhoneme.desc})`;
+  }
+  render();
+}
+
+function restart(){
+  currentLevel=0;score=0;hintsLeft=3;loadLevel();
+}
+
+loadLevel();
+</script>
+</body>
+</html>
